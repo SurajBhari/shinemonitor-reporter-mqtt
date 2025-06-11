@@ -1,21 +1,5 @@
 template:
   - sensor:
-      - name: "Battery Charge Power"
-        unit_of_measurement: "W"
-        state_class: "measurement"
-        device_class: "power"
-        state: >
-          {% set battery_voltage = states('sensor.shinemonitor_reporter_battery_voltage') | float %}
-          {% set battery_charge_current = states('sensor.shinemonitor_reporter_battery_charge_current') | float %}
-          {{ (battery_voltage * battery_charge_current) | round(0) }}
-      - name: "Battery Discharge Power"
-        unit_of_measurement: "W"
-        state_class: "measurement"
-        device_class: "power"
-        state: >
-          {% set battery_voltage = states('sensor.shinemonitor_reporter_battery_voltage') | float %}
-          {% set battery_discharge_current = states('sensor.shinemonitor_reporter_battery_discharge_current') | float %}
-          {{ (battery_voltage * battery_discharge_current) | round(0) }}
       - name: "Grid Input Power"
         unit_of_measurement: "W"
         state_class: "measurement"

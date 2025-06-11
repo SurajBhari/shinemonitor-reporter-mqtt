@@ -14,7 +14,8 @@ from tzlocal import get_localzone
 import config
 from get_data import get_token, get_generation_latest
 from utils import log
-
+from collections import OrderedDict
+from datetime import datetime
 # -----------------------------------------------------------------------------
 #  Sensor Definitions
 # -----------------------------------------------------------------------------
@@ -72,59 +73,6 @@ detectors = OrderedDict([
         unit='W',
         icon='mdi:solar-power',
         json_value=PV_INPUT_POWER,
-    )),
-    (BATTERY_VOLTAGE, dict(
-        title='Battery Voltage',
-        topic_category='sensor',
-        device_class='voltage',
-        state_class='measurement',
-        unit='V',
-        icon='mdi:battery-charging',
-        json_value=BATTERY_VOLTAGE,
-    )),
-    (BATTERY_CAPACITY, dict(
-        title='Battery Capacity',
-        topic_category='sensor',
-        device_class='battery',
-        state_class='measurement',
-        unit='%',
-        icon='mdi:home-battery',
-        json_value=BATTERY_CAPACITY,
-    )),
-    (BATTERY_DISCHARGE_CURRENT, dict(
-        title='Battery Discharge Current',
-        topic_category='sensor',
-        device_class='current',
-        state_class='measurement',
-        unit='A',
-        icon='mdi:battery-minus',
-        json_value=BATTERY_DISCHARGE_CURRENT,
-    )),
-    (BATTERY_CHARGE_CURRENT, dict(
-        title='Battery Charge Current',
-        topic_category='sensor',
-        device_class='current',
-        state_class='measurement',
-        unit='A',
-        icon='mdi:battery-plus',
-        json_value=BATTERY_CHARGE_CURRENT,
-    )),
-    (AC_OUTPUT_VOLTAGE, dict(
-        title='AC Output Voltage',
-        topic_category='sensor',
-        device_class='voltage',
-        state_class='measurement',
-        unit='V',
-        icon='mdi:gauge',
-        json_value=AC_OUTPUT_VOLTAGE,
-    )),
-    (OUTPUT_LOAD, dict(
-        title='AC Output Load',
-        topic_category='sensor',
-        state_class='measurement',
-        unit='%',
-        icon='mdi:home-percent',
-        json_value=OUTPUT_LOAD,
     )),
     (AC_OUTPUT_ACTIVE_POWER, dict(
         title='AC output active power',
@@ -290,50 +238,105 @@ def publish(topic, message, retain=False):
 mqtt_client_connected = False
 
 
-# -----------------------------------------------------------------------------
-#  Data Preparation and Publisher Functions
-# -----------------------------------------------------------------------------
-
-
-def prepare_payload(data):
+def prepare_payload(raw_data):
+    """
+    Accepts either:
+      • dict-of-dicts style: {"Grid voltage": {"val": "230"} …}
+      • list-of-dicts style: [{"title": "Grid voltage", "val": "230"} …]
+    and returns {PAYLOAD_NAME: OrderedDict(…)}
+    """
     global prev_total_generation
-    payload = OrderedDict()
-    payload['id'] = data['id']['val']
-    payload['timestamp'] = (datetime.strptime(data['Timestamp']['val'], '%Y-%m-%d %H:%M:%S')
-                            .astimezone().replace(microsecond=0).isoformat())
-    payload['sn'] = data['SN']['val']
-    payload['machine_type'] = data['Machine type']['val']
-    payload['main_cpu_version'] = data['Main CPU version']['val']
-    payload['slave_1_cpu_version'] = data['Slave 1 CPU version']['val']
-    payload[GRID_VOLTAGE] = float(data['Grid voltage']['val'])
-    payload['grid_frequency'] = float(data['Grid frequency']['val'])
-    payload[PV_INPUT_VOLTAGE] = float(data['PV1 Input voltage']['val'])
-    payload[PV_INPUT_POWER] = int(data['PV1 Input Power']['val'])
-    payload[BATTERY_VOLTAGE] = float(data['Battery Voltage']['val'])
-    payload[BATTERY_CAPACITY] = int(data['Battery Capacity']['val'])
-    payload[BATTERY_DISCHARGE_CURRENT] = float(data['Battery Discharging Current']['val'])
-    payload[BATTERY_CHARGE_CURRENT] = float(data['Battery Charging Current']['val'])
-    payload[AC_OUTPUT_VOLTAGE] = float(data['AC output voltage']['val'])
-    payload['ac_output_frequency'] = float(data['AC Output Frequency']['val'])
-    payload[OUTPUT_LOAD] = int(data['Output load percent']['val'])
-    payload[AC_OUTPUT_ACTIVE_POWER] = int(data['AC output active power']['val'])
-    payload['ac_output_apparent_power'] = int(data['AC output apparent power']['val'])
-    # TODO error correction
-    payload[TODAY_GENERATION] = int(data['Today generation']['val'])
-    payload[MONTH_GENERATION] = int(data['Month generation']['val'])
-    payload[YEAR_GENERATION] = int(data['Year generation']['val'])
 
-    # Weird error with '-' coming in for some reason in Total generation response
+    # --- Normalise raw_data into dict-of-dicts --------------------------------
+    if isinstance(raw_data, list):
+        data = {}
+        for item in raw_data:
+            title = item.get("title", "")
+            if title:                         # ignore items missing a title
+                # Keep the last duplicate we see; feel free to reverse() if you
+                # prefer the first.
+                data[title] = {"val": item.get("val", "")}
+    elif isinstance(raw_data, dict):
+        data = raw_data
+    else:
+        raise TypeError("raw_data must be a dict or a list of dicts")
+
+    # --- Helpers --------------------------------------------------------------
+    def safe_get(*keys):
+        """Return the first non-empty .val for keys, else ''."""
+        for k in keys:
+            v = data.get(k, {}).get("val", "")
+            if v not in ("", None):
+                return v
+        return ""
+
+    def safe_float(*keys):
+        try:
+            return float(safe_get(*keys))
+        except (ValueError, TypeError):
+            return ""
+
+    def safe_int(*keys):
+        try:
+            return int(float(safe_get(*keys)))   # handles '28.0' as well
+        except (ValueError, TypeError):
+            return ""
+
+    # --- Build payload --------------------------------------------------------
+    p = OrderedDict()
+
+    # plain strings
+    p["id"]                 = safe_get("id")
+    p["sn"]                 = safe_get("SN")
+    p["machine_type"]       = safe_get("Machine type", "Equipment type")
+
+    # timestamp
+    ts_raw = safe_get("Timestamp")
     try:
-        payload[TOTAL_GENERATION] = float(data['Total generation']['val'])
-        prev_total_generation = payload[TOTAL_GENERATION]
-    except ValueError:
-        payload[TOTAL_GENERATION] = prev_total_generation
+        p["timestamp"] = (
+            datetime.strptime(ts_raw, "%Y-%m-%d %H:%M:%S")
+            .astimezone()     # converts from naïve-local to aware-local
+            .replace(microsecond=0)
+            .isoformat()
+        )
+    except Exception:
+        p["timestamp"] = ""
 
-    payload['last_updated'] = datetime.now(local_tz).astimezone().replace(microsecond=0).isoformat()
+    # numeric fields ─ use first matching key in each alias list
+    p[GRID_VOLTAGE]             = safe_float("Grid voltage",
+                                             "Grid R voltage")
+    p["grid_frequency"]         = safe_float("Grid frequency")
+    p[PV_INPUT_VOLTAGE]         = safe_float("PV1 Input voltage",
+                                             "PV1 voltage")
+    p[PV_INPUT_POWER]           = safe_int  ("PV1 Input Power",
+                                             "Output Power")
+    p[AC_OUTPUT_ACTIVE_POWER]   = safe_int  ("AC output active power",
+                                             "Output Power")
+    p["ac_output_apparent_power"]= safe_int ("AC output apparent power",
+                                             "Output S")
 
-    payload_info = OrderedDict()
-    payload_info[PAYLOAD_NAME] = payload
+    # generation / energy counters
+    p[TODAY_GENERATION] = safe_int("Today generation", "Energy today")
+    p[MONTH_GENERATION] = safe_int("Month generation")  # may be absent
+    p[YEAR_GENERATION]  = safe_int("Year generation")   # may be absent
+
+    # total generation with the “weird ‘-’” safeguard
+    try:
+        p[TOTAL_GENERATION] = float(
+            safe_get("Total generation", "energy_total")
+        )
+        prev_total_generation = p[TOTAL_GENERATION]
+    except (ValueError, TypeError):
+        p[TOTAL_GENERATION] = prev_total_generation
+
+    # last-updated stamp
+    p["last_updated"] = (
+        datetime.now(local_tz).replace(microsecond=0).isoformat()
+    )
+
+    # wrap and return
+    payload_info            = OrderedDict()
+    payload_info[PAYLOAD_NAME] = p
     return payload_info
 
 
