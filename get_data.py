@@ -3,6 +3,7 @@ import hashlib
 import sys
 import time as time_  # make sure we don't override time
 from datetime import datetime, timedelta
+import urllib
 
 import requests
 
@@ -57,23 +58,28 @@ def get_token():
 
     return token, secret
 
+def sha1_to_lower(data: bytes) -> str:
+    return hashlib.sha1(data).hexdigest().lower()
 
 def generate_token(salt):
-    # Build auth url
-    pwd_sha1 = hashlib.sha1()
-    pwd_sha1.update(config.pwd.encode('utf-8'))
+    # SHA-1(pwd)
+    sha1_pwd = sha1_to_lower(config.pwd.encode())
 
-    action = '&action=authSource&usr=' + str(config.usr) + '&company-key=' + str(config.company_key) + default_params;
-    pwd_action = str(salt) + str(pwd_sha1.hexdigest()) + action  # This complete string needs SHA1
+    # action string
+    action = (
+        "&action=auth"
+        + "&usr=" + urllib.parse.quote(config.usr)
+        + "&company-key=" + config.company_key
+    )
 
-    sign_sha1 = hashlib.sha1()
-    sign_sha1.update(pwd_action.encode('utf-8'))
-    sign = str(sign_sha1.hexdigest())
+    # SHA-1(salt + SHA-1(pwd) + action)
+    sign_input = (str(salt) + sha1_pwd + action).encode()
+    sign = sha1_to_lower(sign_input)
 
-    solar_url = config.base_url + '?sign=' + sign + '&salt=' + str(salt) + action
-    log(solar_url)
-    r = requests.get(solar_url)
-
+    # Full request URL
+    request = f"{config.base_url}?sign={sign}&salt={salt}{action}"
+    r = requests.get(request)
+    log(request)
     token = r.json()['dat']['token']
     secret = r.json()['dat']['secret']
     expiry = r.json()['dat']['expire']
