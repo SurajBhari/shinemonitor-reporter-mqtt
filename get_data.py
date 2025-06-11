@@ -156,7 +156,6 @@ def update_plant_info(token, secret, parameter, value):
     action = '&action=' + action
     action += '&plantid=' + config.plant_id
     action += '&' + parameter + '=' + value
-    action += default_params
 
     salt = get_salt()
     # need to sign entire request url with params
