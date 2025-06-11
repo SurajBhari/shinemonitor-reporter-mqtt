@@ -10,14 +10,7 @@ import requests
 import config
 from utils import log
 
-# API Reference: http://android.shinemonitor.com/
-
-default_params = ('&i18n=en_US'
-                  '&lang=en_US'
-                  '&source=1'
-                  '&_app_client_=android'
-                  '&_app_id_=wifiapp.volfw.solarpower'
-                  '&_app_version_=1.1.0.1')
+# API Reference: http://api.shinemonitor.com/
 
 
 def get_salt():
@@ -99,7 +92,6 @@ def build_request_url(action, salt, secret, token, devcode, pn, sn, plant_id=Non
         action += '&pn=' + pn + '&devcode=' + devcode + '&sn=' + sn + '&devaddr=1'
     if date:
         action += '&date=' + date
-    action += default_params
 
     # need to sign entire request url with params
     secret_action = str(salt) + secret + token + action
@@ -112,36 +104,32 @@ def build_request_url(action, salt, secret, token, devcode, pn, sn, plant_id=Non
 
 
 def get_device_info(token, secret):
-    action = 'queryDeviceInfo'
-    action = '&action=' + action
-    action += '&device=' + ','.join([config.pn, config.devcode, '1', config.sn])
-    action += default_params
+    action = '&action=webQueryCollectorInfo'
+    action += f'&pn={config.pn}'
 
     salt = get_salt()
-    # need to sign entire request url with params
-    secret_action = str(salt) + secret + token + action
-    sign_sha1 = hashlib.sha1()
-    sign_sha1.update(secret_action.encode('utf-8'))
-    sign = str(sign_sha1.hexdigest())
 
-    request_url = config.base_url + '?sign=' + sign + '&salt=' + str(salt) + '&token=' + token + action
+    # Build sign string and hash it
+    sign_source = f"{salt}{secret}{token}{action}"
+    sign = hashlib.sha1(sign_source.encode('utf-8')).hexdigest()
+
+    # Final URL
+    request_url = f"{config.base_url}?sign={sign}&salt={salt}&token={token}{action}"
 
     log(request_url)
     response = requests.get(request_url)
-    errcode = response.json()['err']
+    data = response.json()
 
-    if errcode == 0:
-        data = response.json()['dat']
-        return data
+    if data.get('err') == 0:
+        return data.get('dat')
     else:
-        return '{ErrorCode: ' + str(errcode) + '}'
+        return None  # or raise an exception if preferred
 
 
 def get_device_status(token, secret):
     action = 'queryDeviceStatus'
     action = '&action=' + action
     action += '&device=' + ','.join([config.pn, config.devcode, '1', config.sn])
-    action += default_params
 
     salt = get_salt()
     # need to sign entire request url with params
