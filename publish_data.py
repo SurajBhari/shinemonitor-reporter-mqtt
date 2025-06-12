@@ -44,6 +44,7 @@ def publish_sensor_data():
             state_topic = f"{base_topic}/shinemonitor/{key}"
 
             if key not in discovery_sent:
+                state_class = "measurement" if unit else "total"
                 payload = {
                     "name": f"{sensor_name} {key}",
                     "state_topic": state_topic,
@@ -53,6 +54,7 @@ def publish_sensor_data():
                         "name": sensor_name,
                         "manufacturer": "ShineMonitor"
                     },
+                    "state_class": state_class,
                 }
                 if unit:
                     payload["unit_of_measurement"] = unit
