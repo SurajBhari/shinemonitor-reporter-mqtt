@@ -44,7 +44,11 @@ def publish_sensor_data():
             state_topic = f"{base_topic}/shinemonitor/{key}"
 
             if key not in discovery_sent:
-                state_class = "measurement" if unit else "total"
+                if "today" in key and unit:  # energy today sensor
+                    state_class = "total_increasing"
+                else:
+                    state_class = "measurement" if unit else "total"
+
                 payload = {
                     "name": f"{sensor_name} {key}",
                     "state_topic": state_topic,
@@ -56,11 +60,18 @@ def publish_sensor_data():
                     },
                     "state_class": state_class,
                 }
+
+                if state_class == "total_increasing":
+                    # Set last reset to today's date at 00:00:00 UTC
+                    payload["last_reset"] = time.strftime("%Y-%m-%dT00:00:00Z", time.gmtime())
+
                 if unit:
                     payload["unit_of_measurement"] = unit
+                    payload["device_class"] = "energy"
 
                 client.publish(discovery_topic, json.dumps(payload), retain=True)
                 discovery_sent.add(key)
+
 
             # Publish the sensor value
             client.publish(state_topic, value)
