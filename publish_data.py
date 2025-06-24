@@ -9,7 +9,6 @@ from config import (
     discovery_prefix,
     base_topic,
     sensor_name,
-    suffix
 )
 from get_data import get_token, get_generation_latest
 
@@ -40,9 +39,9 @@ def publish_sensor_data():
             if value is None:
                 continue
 
-            # Topic format: homeassistant/sensor/shinemonitor<suffix>/<key>
-            discovery_topic = f"{discovery_prefix}/sensor/shinemonitor{suffix}/{key}/config"
-            state_topic = f"{base_topic}/shinemonitor{suffix}/{key}"
+            # Topic format: homeassistant/sensor/shinemonitor/<key>
+            discovery_topic = f"{discovery_prefix}/sensor/shinemonitor/{key}/config"
+            state_topic = f"{base_topic}/shinemonitor/{key}"
 
             if key not in discovery_sent:
                 if "today" in key and unit:  # energy today sensor
