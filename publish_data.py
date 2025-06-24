@@ -42,7 +42,7 @@ def publish_sensor_data():
 
             # Topic format: homeassistant/sensor/shinemonitor/<key>
             discovery_topic = f"{discovery_prefix}/sensor/shinemonitor{suffix}/{key}/config"
-            state_topic = f"{base_topic}/shinemonitor/{key}"
+            state_topic = f"{base_topic}/shinemonitor{suffix}/{key}"
 
             if key not in discovery_sent:
                 if "today" in key and unit:  # energy today sensor
