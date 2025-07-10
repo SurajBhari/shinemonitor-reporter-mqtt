@@ -18,7 +18,7 @@ def slugify(text):
     return text.lower().replace(" ", "_").replace("'", "").replace("\"", "").replace("/", "_")
 
 # MQTT Client Setup
-client = mqtt.Client(protocol=mqtt.MQTTv311)
+client = mqtt.Client(protocol=mqtt.MQTTv311, callback_api_version=5)
 client.connect(hostname, port)
 client.loop_start()
 
