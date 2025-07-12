@@ -156,7 +156,7 @@ def publish_sensor_data():
                 #print(f"Published discovery for {key} to {discovery_topic}")
                 discovery_sent.add(key)
 
-            print(state_class, value)
+            print(state_topic, state_class, device_class, unit, value)
             # Publish the sensor value
             client.publish(state_topic, value)
 
