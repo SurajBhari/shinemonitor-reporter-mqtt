@@ -153,9 +153,9 @@ def publish_sensor_data():
                 
 
                 client.publish(discovery_topic, json.dumps(payload), retain=True)
-                print(f"Published discovery for {key} to {discovery_topic}")
+                #print(f"Published discovery for {key} to {discovery_topic}")
                 discovery_sent.add(key)
-            
+
             print(state_class, value)
             # Publish the sensor value
             client.publish(state_topic, value)
