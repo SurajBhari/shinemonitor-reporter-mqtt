@@ -40,7 +40,12 @@ def publish_sensor_data():
             if value is None:
                 continue
 
-            is_number = isinstance(value, (int, float)) or (isinstance(value, str) and value.replace('.', '', 1).isdigit())
+            is_number = False
+            try:
+                float(value)
+                is_number = True
+            except (ValueError, TypeError):
+                pass
 
             discovery_topic = f"{discovery_prefix}/sensor/shinemonitor{suffix}/{key}/config"
             state_topic = f"{base_topic}/shinemonitor{suffix}/{key}"
@@ -63,6 +68,9 @@ def publish_sensor_data():
                         "manufacturer": "ShineMonitor"
                     },
                     "state_class": state_class,
+                    "value_template": "{{ value_json.val }}",
+                    "json_attributes_topic": state_topic,
+                    "json_attributes_template": "{{ value_json | tojson }}"
                 }
 
                 if state_class == "total_increasing":
@@ -77,6 +85,7 @@ def publish_sensor_data():
                     "lux": "illuminance", "lm": "illuminance", "cd": "illuminance",
                     "%": "humidity",
                     "ppm": "carbon_dioxide", "ppb": "carbon_monoxide",
+                    "HZ": "frequency", "h": "duration", "S": "duration", "VA": "apparent_power"
                 }
 
                 if is_number and unit:
@@ -85,12 +94,9 @@ def publish_sensor_data():
                     device_class = unit_to_device_class.get(unit)
                     if device_class:
                         payload["device_class"] = device_class
-                elif not is_number:
-                    payload["device_class"] = None
 
-                payload["json_attributes_topic"] = state_topic
-                payload["value_template"] = "{{ value_json.val }}"
-                payload["json_attributes_template"] = "{{ value_json | tojson }}"
+                if not is_number:
+                    payload["device_class"] = None
 
                 icon_map = {
                     "today": "mdi:calendar-today",
@@ -136,9 +142,9 @@ def publish_sensor_data():
                     "ac": "mdi:air-conditioner",
                     "manufacturer": "mdi:factory",
                     "id": "mdi:identifier",
-                    "serial": "mdi:barcode",
-                    "name": "mdi:label",
-                    "model": "mdi:cube"
+                    "sn": "mdi:barcode",
+                    "security_type": "mdi:shield",
+                    "timestamp": "mdi:clock"
                 }
 
                 payload["icon"] = "mdi:flash"
