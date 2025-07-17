@@ -158,7 +158,7 @@ def publish_sensor_data():
 
             print(state_topic, unit, value)
             # Publish the sensor value
-            client.publish(state_topic, value)
+            client.publish(state_topic, json.dumps(item))
 
     except Exception as e:
         print(f"Error fetching or publishing data: {e}")
