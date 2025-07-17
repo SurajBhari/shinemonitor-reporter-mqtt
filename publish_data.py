@@ -45,11 +45,27 @@ def publish_sensor_data():
             state_topic = f"{base_topic}/shinemonitor{suffix}/{key}"
 
             if key not in discovery_sent:
-                if "today" in key and unit:  # energy today sensor
+                # Determine state_class based on key and unit
+                if "today" in key and unit:
                     state_class = "total_increasing"
                 else:
                     state_class = "measurement" if unit else "total"
 
+                # After determining device_class, override state_class if needed
+                if unit:
+                    unit = unit.strip()
+                    payload["unit_of_measurement"] = unit
+                    device_class = unit_to_device_class.get(unit)
+                    if device_class:
+                        payload["device_class"] = device_class
+                        # Override state_class if device_class is "energy"
+                        if device_class == "energy":
+                            if "today" in key:
+                                state_class = "total_increasing"
+                            else:
+                                state_class = "total"
+
+                
                 payload = {
                     "name": f"{sensor_name} {key}",
                     "state_topic": state_topic,
