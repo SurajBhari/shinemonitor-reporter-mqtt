@@ -34,38 +34,25 @@ def publish_sensor_data():
 
         for item in data:
             key = slugify(item.get("title", "unknown"))
-            value = item.get("val", None)
-            unit = item.get("unit", None)
-            
+            value = item.get("val")
+            unit = item.get("unit")
+
             if value is None:
                 continue
 
-            # Topic format: homeassistant/sensor/shinemonitor/<key>
+            is_number = isinstance(value, (int, float)) or (isinstance(value, str) and value.replace('.', '', 1).isdigit())
+
             discovery_topic = f"{discovery_prefix}/sensor/shinemonitor{suffix}/{key}/config"
             state_topic = f"{base_topic}/shinemonitor{suffix}/{key}"
 
             if key not in discovery_sent:
-                # Determine state_class based on key and unit
-                if "today" in key and unit:
+                if not is_number:
+                    state_class = "measurement"
+                elif "today" in key and unit:
                     state_class = "total_increasing"
                 else:
                     state_class = "measurement" if unit else "total"
 
-                # After determining device_class, override state_class if needed
-                if unit:
-                    unit = unit.strip()
-                    payload["unit_of_measurement"] = unit
-                    device_class = unit_to_device_class.get(unit)
-                    if device_class:
-                        payload["device_class"] = device_class
-                        # Override state_class if device_class is "energy"
-                        if device_class == "energy":
-                            if "today" in key:
-                                state_class = "total_increasing"
-                            else:
-                                state_class = "total"
-
-                
                 payload = {
                     "name": f"{sensor_name} {key}",
                     "state_topic": state_topic,
@@ -79,41 +66,32 @@ def publish_sensor_data():
                 }
 
                 if state_class == "total_increasing":
-                    # Set last reset to today's date at 00:00:00 UTC
                     payload["last_reset"] = time.strftime("%Y-%m-%dT00:00:00Z", time.gmtime())
 
-                # Map units to device classes
                 unit_to_device_class = {
-                    # Voltage
                     "V": "voltage", "mV": "voltage", "µV": "voltage", "kV": "voltage", "MV": "voltage",
-                    # Current
                     "A": "current", "mA": "current", "µA": "current", "kA": "current",
-                    # Power
                     "W": "power", "mW": "power", "kW": "power", "MW": "power",
-                    # Energy
                     "Wh": "energy", "mWh": "energy", "kWh": "energy", "MWh": "energy",
-                    # Temperature
                     "°C": "temperature", "°F": "temperature",
-                    # Illuminance
                     "lux": "illuminance", "lm": "illuminance", "cd": "illuminance",
-                    # Humidity-like (careful here)
-                    "%": "humidity",  # You may want to override based on sensor name
-                    # Gas sensors (optional, if used)
-                    "ppm": "carbon_dioxide",  # adjust based on context
-                    "ppb": "carbon_monoxide",  # example
+                    "%": "humidity",
+                    "ppm": "carbon_dioxide", "ppb": "carbon_monoxide",
                 }
 
-                # Apply to payload
-                if unit:
+                if is_number and unit:
                     unit = unit.strip()
                     payload["unit_of_measurement"] = unit
                     device_class = unit_to_device_class.get(unit)
                     if device_class:
                         payload["device_class"] = device_class
+                elif not is_number:
+                    payload["device_class"] = None
 
                 payload["json_attributes_topic"] = state_topic
                 payload["value_template"] = "{{ value_json.val }}"
                 payload["json_attributes_template"] = "{{ value_json | tojson }}"
+
                 icon_map = {
                     "today": "mdi:calendar-today",
                     "yesterday": "mdi:calendar",
@@ -155,25 +133,24 @@ def publish_sensor_data():
                     "heat": "mdi:radiator",
                     "heater": "mdi:radiator",
                     "cool": "mdi:air-conditioner",
-                    "ac": "mdi:air-conditioner"
+                    "ac": "mdi:air-conditioner",
+                    "manufacturer": "mdi:factory",
+                    "id": "mdi:identifier",
+                    "serial": "mdi:barcode",
+                    "name": "mdi:label",
+                    "model": "mdi:cube"
                 }
 
-                # Default icon
                 payload["icon"] = "mdi:flash"
-
-                # Match the first key in icon_map found in `key`
                 for k, v in icon_map.items():
                     if k in key:
                         payload["icon"] = v
                         break
-                
 
                 client.publish(discovery_topic, json.dumps(payload), retain=True)
-                #print(f"Published discovery for {key} to {discovery_topic}")
                 discovery_sent.add(key)
 
             print(state_topic, unit, value)
-            # Publish the sensor value
             client.publish(state_topic, json.dumps(item))
 
     except Exception as e:
