@@ -148,7 +148,7 @@ def get_device_status(token, secret):
         data = response.json()['dat']
         return data
     else:
-        return '{ErrorCode: ' + str(errcode) + '}'
+        return '{ErrorCode: ' + str(errcode) + '} '+response.text 
 
 
 def update_plant_info(token, secret, parameter, value):
@@ -173,7 +173,7 @@ def update_plant_info(token, secret, parameter, value):
     if errcode == 0:
         return response
     else:
-        return '{ErrorCode: ' + str(errcode) + '}'
+        return '{ErrorCode: ' + str(errcode) + '} '+response.text 
 
 
 def get_plant_info(token, secret):
@@ -191,7 +191,7 @@ def get_plant_info(token, secret):
         data = response.json()['dat']
         return data
     else:
-        return '{ErrorCode: ' + str(errcode) + '}'
+        return '{ErrorCode: ' + str(errcode) + '} '+response.text 
 
 
 def get_generation_latest(token, secret):
@@ -208,7 +208,7 @@ def get_generation_latest(token, secret):
         data = response.json()['dat']
         return data
     else:
-        return '{ErrorCode: ' + str(errcode) + '}'
+        return '{ErrorCode: ' + str(errcode) + '} '+response.text 
 
 
 if __name__ == '__main__':
