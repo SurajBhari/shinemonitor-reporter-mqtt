@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import urllib
 
 import requests
-
+import os
 import config
 from utils import log
 
@@ -203,11 +203,14 @@ def get_generation_latest(token, secret):
     log(request_url)
     response = requests.get(request_url)
     errcode = response.json()['err']
+    desc = response.json().get('desc', '')
 
     if errcode == 0:
         data = response.json()['dat']
         return data
     else:
+        if desc and "no_auth" in desc.lower():
+            raise ValueError("No authorization to access this data.")
         return '{ErrorCode: ' + str(errcode) + '} '+response.text 
 
 
@@ -217,12 +220,72 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         endpoint = str(sys.argv[1])
         if endpoint == '--latest':
-            print(get_generation_latest(token, secret))
+            try:
+                print(get_generation_latest(token, secret))
+            except ValueError as e:
+                if "no authorization" in str(e).lower():
+                    # delete the file token so that we can re-login
+                    os.remove('token')
+                    # re-login
+                    token, secret = get_token()
+                    print(get_generation_latest(token, secret))
+                else:   
+                    print(f"Error occurred: {e}")
         if endpoint == '--plantInfo':
-            print(get_plant_info(token, secret))
+            try:
+                print(get_plant_info(token, secret))
+            except ValueError as e:
+                if "no authorization" in str(e).lower():
+                    # delete the file token so that we can re-login
+                    os.remove('token')
+                    # re-login
+                    token, secret = get_token()
+                    print(get_plant_info(token, secret))
+                else:   
+                    print(f"Error occurred: {e}")
+
         if endpoint == '--updatePlantInfo':
-            print(update_plant_info(token, secret, str(sys.argv[2]), str(sys.argv[3])))
+            if len(sys.argv) < 4:
+                print("Usage: get_data.py --updatePlantInfo <parameter> <value>")
+                sys.exit(1)
+            try:
+                print(update_plant_info(token, secret, str(sys.argv[2]), str(sys.argv[3])))
+            except ValueError as e:
+                if "no authorization" in str(e).lower():
+                    # delete the file token so that we can re-login
+                    os.remove('token')
+                    # re-login
+                    token, secret = get_token()
+                    print(update_plant_info(token, secret, str(sys.argv[2]), str(sys.argv[3])))
+                else:   
+                    print(f"Error occurred: {e}")
+                    sys.exit(1)
+
         if endpoint == '--deviceInfo':
+            try:
+                print(get_device_info(token, secret))
+            except ValueError as e:
+                if "no authorization" in str(e).lower():
+                    # delete the file token so that we can re-login
+                    os.remove('token')
+                    # re-login
+                    token, secret = get_token()
+                    print(get_device_info(token, secret))
+                else:   
+                    print(f"Error occurred: {e}")
+                    sys.exit(1)
             print(get_device_info(token, secret))
         if endpoint == '--deviceStatus':
+            try:
+                print(get_device_status(token, secret))
+            except ValueError as e:
+                if "no authorization" in str(e).lower():
+                    # delete the file token so that we can re-login
+                    os.remove('token')
+                    # re-login
+                    token, secret = get_token()
+                    print(get_device_status(token, secret))
+                else:   
+                    print(f"Error occurred: {e}")
+                    sys.exit(1)
             print(get_device_status(token, secret))
