@@ -11,6 +11,7 @@ from config import (
     sensor_name,
     suffix
 )
+import sys
 from get_data import get_token, get_generation_latest
 
 # Format MQTT-safe keys
@@ -171,4 +172,7 @@ def run_service():
         time.sleep(interval_seconds)
 
 if __name__ == "__main__":
-    run_service()
+    if "-s" in sys.argv or "--single" in sys.argv:
+        publish_sensor_data()
+    else:
+        run_service()
