@@ -33,6 +33,10 @@ def publish_sensor_data():
         token, secret = get_token()
         data = get_generation_latest(token, secret)
 
+        if isinstance(data, str):
+            print(f"API returned no data: {data}")
+            return
+
         for item in data:
             key = slugify(item.get("title", "unknown"))
             value = item.get("val")
